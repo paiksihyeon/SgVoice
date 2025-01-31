@@ -20,4 +20,5 @@
         android:background="#80000000"
         android:textColor="#FFFFFF"
         android:textSize="18sp" />
+
 </RelativeLayout>

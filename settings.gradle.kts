@@ -2,17 +2,17 @@ pluginManagement {
     repositories {
         google()
         mavenCentral()
-        gradlePluginPortal()
+        maven { url = uri("https://maven.google.com") }
     }
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
-        google()  // Google 저장소 추가
-        mavenCentral()  // Maven Central 추가
+        google()
+        mavenCentral()
+        maven { url = uri("https://maven.google.com") }
     }
 }
 
-rootProject.name = "sgvoice"
+rootProject.name = "SgVoice"
 include(":app")
