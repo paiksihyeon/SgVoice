@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -12,9 +11,6 @@ import androidx.camera.view.PreviewView
 import androidx.camera.core.*
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.Face
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetectorOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -22,6 +18,9 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var previewView: PreviewView
+    private lateinit var speechHelper: SpeechRecognitionHelper
+    private lateinit var faceHelper: FaceRecognitionHelper
+    private lateinit var speakerText: TextView
 
     private val cameraPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -29,7 +28,7 @@ class MainActivity : AppCompatActivity() {
         if (granted) {
             startCamera()
         } else {
-            showPermissionDeniedMessage()
+            speakerText.text = "카메라 권한이 필요합니다."
         }
     }
 
@@ -38,6 +37,19 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.main_layout)
 
         previewView = findViewById(R.id.previewView)
+        speakerText = findViewById(R.id.speakerText)
+
+        speechHelper = SpeechRecognitionHelper(this) { recognizedText ->
+            runOnUiThread {
+                speakerText.text = "음성 인식: $recognizedText"
+            }
+        }
+
+        faceHelper = FaceRecognitionHelper(this) { faces ->
+            runOnUiThread {
+                speakerText.text = "감지된 얼굴: ${faces.size}명"
+            }
+        }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED
@@ -48,6 +60,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
+        speechHelper.startListening()
     }
 
     private fun startCamera() {
@@ -82,43 +95,13 @@ class MainActivity : AppCompatActivity() {
     private fun processImage(imageProxy: ImageProxy) {
         val mediaImage = imageProxy.image ?: return
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-
-        val options = FaceDetectorOptions.Builder()
-            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-            .build()
-
-        val detector = FaceDetection.getClient(options)
-
-        detector.process(image)
-            .addOnSuccessListener { faces ->
-                handleFaceDetection(faces)
-            }
-            .addOnFailureListener { e ->
-                e.printStackTrace()
-            }
-            .addOnCompleteListener {
-                imageProxy.close()
-            }
-    }
-
-    private fun handleFaceDetection(faces: List<Face>) {
-        val message = if (faces.isNotEmpty()) {
-            "사람 감지됨 (${faces.size}명)"
-        } else {
-            "사람 없음"
-        }
-
-        runOnUiThread {
-            findViewById<TextView>(R.id.speakerText).text = message
-        }
-    }
-
-    private fun showPermissionDeniedMessage() {
-        Toast.makeText(this, "카메라 권한이 필요합니다. 권한을 허용해주세요.", Toast.LENGTH_LONG).show()
+        faceHelper.processImage(image)
+        imageProxy.close()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
+        speechHelper.destroy()
     }
 }
