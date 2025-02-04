@@ -3,8 +3,10 @@ package com.example.sgvoice
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -18,9 +20,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var previewView: PreviewView
-    private lateinit var speechHelper: SpeechRecognitionHelper
-    private lateinit var faceHelper: FaceRecognitionHelper
     private lateinit var speakerText: TextView
+    private lateinit var faceHelper: FaceRecognitionHelper
 
     private val cameraPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -32,6 +33,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var detectedFaceCount: Int = -1 // 이전 감지된 인원 수 저장 (초기값 -1)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.main_layout)
@@ -39,15 +42,12 @@ class MainActivity : AppCompatActivity() {
         previewView = findViewById(R.id.previewView)
         speakerText = findViewById(R.id.speakerText)
 
-        speechHelper = SpeechRecognitionHelper(this) { recognizedText ->
+        faceHelper = FaceRecognitionHelper(this) { faces, faceCount ->
             runOnUiThread {
-                speakerText.text = "음성 인식: $recognizedText"
-            }
-        }
-
-        faceHelper = FaceRecognitionHelper(this) { faces ->
-            runOnUiThread {
-                speakerText.text = "감지된 얼굴: ${faces.size}명"
+                if (detectedFaceCount != faceCount) { // 이전 값과 다를 때만 업데이트
+                    detectedFaceCount = faceCount
+                    updateFaceCountUI()
+                }
             }
         }
 
@@ -60,7 +60,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
-        speechHelper.startListening()
     }
 
     private fun startCamera() {
@@ -73,12 +72,13 @@ class MainActivity : AppCompatActivity() {
             }
 
             val imageAnalysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST) // 최신 프레임만 분석
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, { imageProxy ->
+                    it.setAnalyzer(cameraExecutor) { imageProxy ->
                         processImage(imageProxy)
-                    })
+                    }
                 }
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -92,16 +92,19 @@ class MainActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    private fun processImage(imageProxy: ImageProxy) {
+    @OptIn(ExperimentalGetImage::class) private fun processImage(imageProxy: ImageProxy) {
         val mediaImage = imageProxy.image ?: return
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         faceHelper.processImage(image)
         imageProxy.close()
     }
 
+    private fun updateFaceCountUI() {
+        speakerText.text = "감지된 사람: ${detectedFaceCount}명"
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
-        speechHelper.destroy()
     }
 }

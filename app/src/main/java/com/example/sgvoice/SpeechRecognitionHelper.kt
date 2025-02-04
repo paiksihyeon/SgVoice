@@ -9,12 +9,17 @@ import android.speech.SpeechRecognizer
 import android.util.Log
 import java.util.Locale
 
-class SpeechRecognitionHelper(context: Context, private val callback: (String) -> Unit) {
+class SpeechRecognitionHelper(
+    private val context: Context,
+    private val onSpeechResult: (String, Int?) -> Unit // 말한 내용과 말한 사람 ID 전달
+) {
     private var speechRecognizer: SpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
     private val recognizerIntent: Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toString())
     }
+
+    var speakingFaceId: Int? = null // 현재 말하는 얼굴 ID 저장
 
     init {
         speechRecognizer.setRecognitionListener(object : RecognitionListener {
@@ -27,8 +32,8 @@ class SpeechRecognitionHelper(context: Context, private val callback: (String) -
                 Log.e("SpeechRecognition", "Error: $error")
             }
             override fun onResults(results: Bundle?) {
-                results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let {
-                    callback(it)
+                results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { recognizedText ->
+                    onSpeechResult(recognizedText, speakingFaceId)
                 }
             }
             override fun onPartialResults(partialResults: Bundle?) {}

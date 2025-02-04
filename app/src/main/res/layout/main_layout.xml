@@ -18,9 +18,15 @@
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
+        android:layout_marginBottom="60dp"
         android:padding="16dp"
-        android:background="#80000000"
+        android:text="감지된 사람: 0명"
         android:textColor="#FFFFFF"
-        android:textSize="18sp" />
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:background="#80000000"
+        android:elevation="10dp"/>
+
+
 
 </RelativeLayout>

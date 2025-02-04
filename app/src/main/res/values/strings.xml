@@ -1,3 +1,6 @@
 <resources>
-    <string name="app_name">sgvoice</string>
+    <string name="app_name">SgVoice</string>
+    <string name="camera_permission_needed">카메라 권한이 필요합니다.</string>
+    <string name="audio_permission_needed">마이크 권한이 필요합니다.</string>
+    <string name="speaker_text">%s: %s</string>
 </resources>
