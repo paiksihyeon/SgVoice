@@ -11,22 +11,24 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- 화자 감지 결과 표시 -->
+    <!-- 얼굴 윤곽선 오버레이 -->
+    <com.example.sgvoice.FaceOverlayView
+        android:id="@+id/faceOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_alignParentTop="true"/>
+
+    <!-- 감지된 얼굴 수 표시 -->
     <TextView
-        android:id="@+id/speakerText"
+        android:id="@+id/faceCountText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:text="감지된 얼굴 수: 0"
+        android:textSize="20sp"
+        android:textColor="#FFFFFF"
+        android:background="#80000000"
+        android:padding="8dp"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:layout_marginBottom="60dp"
-        android:padding="16dp"
-        android:text="감지된 사람: 0명"
-        android:textColor="#FFFFFF"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:background="#80000000"
-        android:elevation="10dp"/>
-
-
-
+        android:layout_marginBottom="20dp"/>
 </RelativeLayout>

@@ -1,40 +1,46 @@
 package com.example.sgvoice
 
 import android.content.Context
+import android.graphics.PointF
+import android.graphics.Rect
 import android.util.Log
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.*
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetectorOptions
+import java.util.concurrent.ConcurrentHashMap
 
 class FaceRecognitionHelper(
     private val context: Context,
-    private val callback: (List<DetectedFace>, Int) -> Unit
+    private val callback: (List<DetectedFace>) -> Unit
 ) {
     private val detectorOptions = FaceDetectorOptions.Builder()
-        .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST) //  속도를 빠르게 변경
-        .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE) //  랜드마크 감지를 끔
-        .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE) //  표정 감지를 끔
-        .enableTracking() //  얼굴 추적 활성화 (같은 얼굴을 동일하게 인식)
+        .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+        .enableTracking()
+        .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+        .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
+        .setMinFaceSize(0.02f)
         .build()
 
     private val faceDetector = FaceDetection.getClient(detectorOptions)
+    private val faceIdMap = ConcurrentHashMap<Int, Int>()
+    private var nextFaceId = 1
 
     fun processImage(image: InputImage) {
-        val startTime = System.currentTimeMillis() //  시작 시간 기록
         faceDetector.process(image)
             .addOnSuccessListener { faces ->
-                val processingTime = System.currentTimeMillis() - startTime //  감지 속도 계산
-                Log.d("FaceRecognition", "Processing Time: ${processingTime}ms") //  로그 출력
-
-                val detectedFaces = faces.map { face ->
-                    val faceId = face.trackingId ?: -1
-                    DetectedFace(faceId)
+                val detectedFaces = faces.filter { face ->
+                    face.boundingBox.width() > 50 && face.boundingBox.height() > 50
+                }.map { face ->
+                    val assignedId = faceIdMap.getOrPut(face.trackingId ?: -1) { nextFaceId++ }
+                    DetectedFace(assignedId, face.boundingBox, face.allLandmarks.map { it.position })
                 }
-                callback(detectedFaces, detectedFaces.size)
+                callback(detectedFaces)
             }
             .addOnFailureListener { e ->
-                Log.e("FaceRecognition", "Face detection failed", e)
+                Log.e("FaceRecognition", "얼굴 감지 실패", e)
             }
     }
 }
 
-data class DetectedFace(val id: Int)
+// ✅ ML Kit의 PointF를 명확하게 사용하도록 수정
+data class DetectedFace(val id: Int, val boundingBox: Rect, val landmarkPoints: List<PointF>)

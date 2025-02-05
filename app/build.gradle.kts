@@ -56,6 +56,7 @@ dependencies {
 
     // ML Kit 라이브러리
     implementation("com.google.mlkit:face-detection:16.1.7")
+    implementation("com.google.mlkit:vision-common:16.7.0")
 
     // AndroidX 라이브러리
     implementation("androidx.core:core-ktx:1.12.0")
