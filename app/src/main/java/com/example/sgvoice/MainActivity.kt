@@ -6,6 +6,7 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
+import android.util.Size
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
@@ -67,7 +68,8 @@ class MainActivity : AppCompatActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor()
     }
 
-    @OptIn(ExperimentalGetImage::class) private fun startCamera() {
+    @OptIn(ExperimentalGetImage::class)
+    private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
@@ -76,15 +78,18 @@ class MainActivity : AppCompatActivity() {
             }
 
             val imageAnalysis = ImageAnalysis.Builder()
-                .setTargetResolution(android.util.Size(1920, 1080))
+                .setTargetResolution(Size(640, 480)) // 해상도를 낮춰 얼굴 감지 성능 개선
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        val mediaImage = imageProxy.image ?: return@setAnalyzer
-                        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                        faceHelper.processImage(image)
-                        imageProxy.close()
+                        val mediaImage = imageProxy.image
+                        if (mediaImage != null) {
+                            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                            faceHelper.processImage(image, imageProxy)
+                        } else {
+                            imageProxy.close() // null이면 닫아줌
+                        }
                     }
                 }
 
