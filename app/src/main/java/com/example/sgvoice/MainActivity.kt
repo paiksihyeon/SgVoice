@@ -2,44 +2,26 @@ package com.example.sgvoice
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.PointF
-import android.graphics.Rect
 import android.os.Bundle
 import android.util.Log
-import android.util.Size
 import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetectorOptions
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
-
-    private lateinit var cameraExecutor: ExecutorService
     private lateinit var previewView: PreviewView
     private lateinit var faceOverlay: FaceOverlayView
     private lateinit var faceCountText: TextView
     private lateinit var faceHelper: FaceRecognitionHelper
 
-    private val cameraPermissionRequest = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            startCamera()
-        } else {
-            Log.e("Camera", "카메라 권한이 필요합니다.")
-        }
+    companion object {
+        private const val CAMERA_PERMISSION_CODE = 1001
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,6 +32,7 @@ class MainActivity : AppCompatActivity() {
         faceOverlay = findViewById(R.id.faceOverlay)
         faceCountText = findViewById(R.id.faceCountText)
 
+        // FaceRecognitionHelper는 얼굴 감지, 랜드마크 추출, 디스크립터 생성 후 고유 ID를 부여합니다.
         faceHelper = FaceRecognitionHelper(this) { faces ->
             runOnUiThread {
                 faceOverlay.setFaces(faces)
@@ -57,18 +40,22 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
-            startCamera()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION_CODE)
         } else {
-            cameraPermissionRequest.launch(Manifest.permission.CAMERA)
+            startCamera()
         }
-
-        cameraExecutor = Executors.newSingleThreadExecutor()
     }
 
-    @OptIn(ExperimentalGetImage::class)
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == CAMERA_PERMISSION_CODE && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startCamera()
+        } else {
+            Log.e("Camera", "카메라 권한이 필요합니다.")
+        }
+    }
+
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener({
@@ -78,33 +65,22 @@ class MainActivity : AppCompatActivity() {
             }
 
             val imageAnalysis = ImageAnalysis.Builder()
-                .setTargetResolution(Size(640, 480)) // 해상도를 낮춰 얼굴 감지 성능 개선
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also {
-                    it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        val mediaImage = imageProxy.image
-                        if (mediaImage != null) {
-                            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-                            faceHelper.processImage(image, imageProxy)
-                        } else {
-                            imageProxy.close() // null이면 닫아줌
+                .build().also {
+                    it.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
+                        runOnUiThread {
+                            val bitmap = previewView.bitmap
+                            if (bitmap != null) {
+                                faceHelper.processImage(bitmap)
+                            }
                         }
+                        imageProxy.close()
                     }
                 }
 
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-            try {
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
-            } catch (exc: Exception) {
-                Log.e("Camera", "카메라 시작 실패", exc)
-            }
+            val cameraSelector = androidx.camera.core.CameraSelector.DEFAULT_BACK_CAMERA
+            cameraProvider.unbindAll()
+            cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis)
         }, ContextCompat.getMainExecutor(this))
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        cameraExecutor.shutdown()
     }
 }
